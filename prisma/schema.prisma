@@ -1,0 +1,723 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Auth & tenancy ---
+
+enum OrganizationRole {
+  OWNER
+  MEMBER
+}
+
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships      OrganizationMember[]
+  assignedTasks    Task[]               @relation("TaskAssignee")
+  changeLogs       ChangeLog[]          @relation("ChangeLogUser")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members OrganizationMember[]
+  clients Client[]
+}
+
+model OrganizationMember {
+  id             String           @id @default(cuid())
+  userId         String           @db.Uuid
+  organizationId String
+  role           OrganizationRole @default(MEMBER)
+  createdAt      DateTime         @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+// --- Client setup ---
+
+model Client {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  name                String
+  businessDescription String?
+  industry            String?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  websites        Website[]
+  recommendations Recommendation[]
+  tasks           Task[]
+  changeLogs      ChangeLog[]
+  monthlyReports  MonthlyReport[]
+  agentRuns       AgentRun[]
+
+  @@index([organizationId])
+}
+
+model Website {
+  id              String   @id @default(cuid())
+  clientId        String
+  name            String
+  url             String
+  cmsType         String?
+  primaryLocation String?
+  serviceAreas    Json     @default("[]")
+  targetServices  Json     @default("[]")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client                  Client                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  keywords                Keyword[]
+  competitors             Competitor[]
+  integrations            Integration[]
+  integrationRuns         IntegrationRun[]
+  pages                   Page[]
+  pageSnapshots           PageSnapshot[]
+  crawlRuns               CrawlRun[]
+  internalLinks           InternalLink[]
+  gscPageSnapshots        GscPageSnapshot[]
+  gscQuerySnapshots       GscQuerySnapshot[]
+  gscQueryPageSnapshots   GscQueryPageSnapshot[]
+  ga4LandingPageSnapshots Ga4LandingPageSnapshot[]
+  rankSnapshots           RankSnapshot[]
+  backlinkSnapshots       BacklinkSnapshot[]
+  recommendations         Recommendation[]
+  tasks                   Task[]
+  changeLogs              ChangeLog[]
+  agentRuns               AgentRun[]
+  monthlyReports          MonthlyReport[]
+
+  @@index([clientId])
+}
+
+enum KeywordDevice {
+  DESKTOP
+  MOBILE
+}
+
+enum KeywordPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Keyword {
+  id        String          @id @default(cuid())
+  websiteId String
+  keyword   String
+  targetUrl String?
+  location  String?
+  device    KeywordDevice   @default(DESKTOP)
+  priority  KeywordPriority @default(MEDIUM)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  website       Website        @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  rankSnapshots RankSnapshot[]
+
+  @@index([websiteId])
+}
+
+model Competitor {
+  id        String   @id @default(cuid())
+  websiteId String
+  name      String
+  domain    String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+}
+
+// --- Integrations ---
+
+enum IntegrationType {
+  GSC
+  GA4
+  AHREFS
+  RANK_TRACKER
+  WORDPRESS
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+model Integration {
+  id                    String            @id @default(cuid())
+  websiteId             String
+  type                  IntegrationType
+  accountId             String?
+  propertyId            String?
+  siteUrl               String?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  expiresAt             DateTime?
+  status                IntegrationStatus @default(DISCONNECTED)
+  lastSyncedAt          DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  website Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  runs    IntegrationRun[]
+
+  @@unique([websiteId, type])
+  @@index([websiteId])
+  @@index([status])
+}
+
+enum IntegrationRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model IntegrationRun {
+  id              String               @id @default(cuid())
+  integrationId   String
+  websiteId       String
+  type            IntegrationType
+  status          IntegrationRunStatus @default(PENDING)
+  dateStart       DateTime?
+  dateEnd         DateTime?
+  recordsImported Int                  @default(0)
+  errorMessage    String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime             @default(now())
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  website     Website     @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([integrationId])
+  @@index([status])
+}
+
+// --- Page inventory ---
+
+enum PageType {
+  HOME
+  SERVICE
+  LOCATION
+  BLOG
+  PRODUCT
+  CATEGORY
+  OTHER
+}
+
+enum PageStatus {
+  ACTIVE
+  REDIRECTED
+  NOT_FOUND
+  NOINDEXED
+  ARCHIVED
+}
+
+model Page {
+  id               String     @id @default(cuid())
+  websiteId        String
+  url              String
+  normalizedUrl    String
+  pageType         PageType   @default(OTHER)
+  targetKeyword    String?
+  searchIntent     String?
+  status           PageStatus @default(ACTIVE)
+  firstDiscoveredAt DateTime  @default(now())
+  lastCrawledAt    DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  website                 Website                  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  snapshots               PageSnapshot[]
+  internalLinksFrom       InternalLink[]           @relation("InternalLinkFrom")
+  internalLinksTo         InternalLink[]           @relation("InternalLinkTo")
+  gscPageSnapshots        GscPageSnapshot[]
+  gscQuerySnapshots       GscQuerySnapshot[]
+  gscQueryPageSnapshots   GscQueryPageSnapshot[]
+  ga4LandingPageSnapshots Ga4LandingPageSnapshot[]
+  recommendations         Recommendation[]
+  tasks                   Task[]
+  changeLogs              ChangeLog[]
+
+  @@unique([websiteId, normalizedUrl])
+  @@index([websiteId])
+  @@index([status])
+}
+
+enum CrawlRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model CrawlRun {
+  id           String         @id @default(cuid())
+  websiteId    String
+  status       CrawlRunStatus @default(PENDING)
+  startUrl     String
+  pagesFound   Int            @default(0)
+  pagesCrawled Int            @default(0)
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  website   Website        @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  snapshots PageSnapshot[]
+
+  @@index([websiteId])
+  @@index([status])
+}
+
+model PageSnapshot {
+  id                    String   @id @default(cuid())
+  pageId                String
+  websiteId             String
+  crawlRunId            String
+  statusCode            Int?
+  finalUrl              String?
+  title                 String?
+  metaDescription       String?
+  h1                    String?
+  h2s                   Json     @default("[]")
+  canonicalUrl          String?
+  robotsMeta            String?
+  wordCount             Int?
+  internalLinkCount     Int?
+  externalLinkCount     Int?
+  imageCount            Int?
+  imagesMissingAltCount Int?
+  schemaTypes           Json     @default("[]")
+  rawHtmlHash           String?
+  createdAt             DateTime @default(now())
+
+  page     Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  website  Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  crawlRun CrawlRun @relation(fields: [crawlRunId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([pageId])
+  @@index([crawlRunId])
+}
+
+model InternalLink {
+  id         String   @id @default(cuid())
+  websiteId  String
+  fromPageId String
+  toPageId   String?
+  fromUrl    String
+  toUrl      String
+  anchorText String?
+  createdAt  DateTime @default(now())
+
+  website  Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  fromPage Page    @relation("InternalLinkFrom", fields: [fromPageId], references: [id], onDelete: Cascade)
+  toPage   Page?   @relation("InternalLinkTo", fields: [toPageId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId])
+  @@index([fromPageId])
+  @@index([toPageId])
+}
+
+// --- GSC snapshots ---
+
+model GscPageSnapshot {
+  id          String   @id @default(cuid())
+  websiteId   String
+  pageId      String?
+  url         String
+  dateStart   DateTime
+  dateEnd     DateTime
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  avgPosition Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  page    Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId, dateStart, dateEnd])
+  @@index([pageId])
+}
+
+model GscQuerySnapshot {
+  id          String   @id @default(cuid())
+  websiteId   String
+  query       String
+  pageId      String?
+  url         String?
+  dateStart   DateTime
+  dateEnd     DateTime
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  avgPosition Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  page    Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId, dateStart, dateEnd])
+  @@index([query])
+}
+
+model GscQueryPageSnapshot {
+  id          String   @id @default(cuid())
+  websiteId   String
+  query       String
+  pageId      String?
+  url         String
+  dateStart   DateTime
+  dateEnd     DateTime
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  avgPosition Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  page    Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId, dateStart, dateEnd])
+  @@index([query])
+  @@index([url])
+}
+
+// --- GA4 snapshots ---
+
+model Ga4LandingPageSnapshot {
+  id                     String   @id @default(cuid())
+  websiteId              String
+  pageId                 String?
+  path                   String
+  url                    String?
+  dateStart              DateTime
+  dateEnd                DateTime
+  sessions               Int      @default(0)
+  users                  Int      @default(0)
+  engagedSessions        Int      @default(0)
+  engagementRate         Float    @default(0)
+  averageEngagementTime  Float    @default(0)
+  conversions            Int      @default(0)
+  revenue                Float?
+  createdAt              DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  page    Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId, dateStart, dateEnd])
+  @@index([path])
+}
+
+// --- Rank tracking (placeholder) ---
+
+model RankSnapshot {
+  id           String        @id @default(cuid())
+  websiteId    String
+  keywordId    String?
+  keyword      String
+  location     String?
+  device       KeywordDevice @default(DESKTOP)
+  searchEngine String        @default("google")
+  rankPosition Int?
+  rankingUrl   String?
+  checkedAt    DateTime
+  createdAt    DateTime      @default(now())
+
+  website Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  keywordRef Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId])
+  @@index([keywordId])
+  @@index([checkedAt])
+}
+
+// --- Ahrefs / backlinks (placeholder) ---
+
+enum BacklinkStatus {
+  LIVE
+  LOST
+  UNKNOWN
+}
+
+model BacklinkSnapshot {
+  id              String         @id @default(cuid())
+  websiteId       String
+  referringDomain String
+  sourceUrl       String
+  targetUrl       String
+  anchorText      String?
+  domainRating    Float?
+  firstSeen       DateTime?
+  lastSeen        DateTime?
+  status          BacklinkStatus @default(UNKNOWN)
+  createdAt       DateTime       @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([referringDomain])
+}
+
+// --- Recommendations & tasks ---
+
+enum RecommendationType {
+  TITLE_TAG_OPPORTUNITY
+  META_DESCRIPTION_OPPORTUNITY
+  H1_OPPORTUNITY
+  CONTENT_REFRESH
+  NEW_CONTENT_OPPORTUNITY
+  INTERNAL_LINK_OPPORTUNITY
+  TECHNICAL_ISSUE
+  INDEXING_ISSUE
+  SCHEMA_OPPORTUNITY
+  IMAGE_ALT_OPPORTUNITY
+  KEYWORD_CANNIBALIZATION
+  CTR_OPPORTUNITY
+  RANKING_DROP
+  COMPETITOR_GAP
+  OTHER
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ImpactLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RecommendationStatus {
+  DETECTED
+  NEEDS_REVIEW
+  APPROVED
+  REJECTED
+  CONVERTED_TO_TASK
+  COMPLETED
+  SKIPPED
+}
+
+model Recommendation {
+  id               String               @id @default(cuid())
+  websiteId        String
+  clientId         String
+  pageId           String?
+  type             RecommendationType
+  title            String
+  description      String
+  currentValue     String?
+  suggestedValue   String?
+  reason           String
+  supportingData   Json                 @default("{}")
+  sourceAgents     Json                 @default("[]")
+  priority         PriorityLevel        @default(MEDIUM)
+  impact           ImpactLevel          @default(MEDIUM)
+  effort           ImpactLevel          @default(MEDIUM)
+  risk             ImpactLevel          @default(LOW)
+  confidenceScore  Float                @default(0)
+  status           RecommendationStatus @default(DETECTED)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  website    Website     @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  page       Page?       @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  tasks      Task[]
+  changeLogs ChangeLog[]
+
+  @@index([websiteId])
+  @@index([clientId])
+  @@index([status])
+  @@index([priority])
+  @@index([type])
+}
+
+enum TaskStatus {
+  TODO
+  NEEDS_REVIEW
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  BLOCKED
+}
+
+model Task {
+  id                String        @id @default(cuid())
+  websiteId         String
+  clientId          String
+  recommendationId  String?
+  pageId            String?
+  title             String
+  description       String?
+  humanInstructions String?
+  url               String?
+  beforeValue       String?
+  afterValue        String?
+  suggestedCopy     String?
+  priority          PriorityLevel @default(MEDIUM)
+  status            TaskStatus    @default(TODO)
+  assigneeId        String?       @db.Uuid
+  dueDate           DateTime?
+  completedAt       DateTime?
+  completionNotes   String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  website        Website         @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  recommendation Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+  page           Page?           @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  assignee       User?           @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  changeLogs     ChangeLog[]
+
+  @@index([websiteId])
+  @@index([clientId])
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+}
+
+model ChangeLog {
+  id               String    @id @default(cuid())
+  websiteId        String
+  clientId         String
+  taskId           String?
+  recommendationId String?
+  pageId           String?
+  url              String
+  changeType       String
+  fieldChanged     String?
+  oldValue         String?
+  newValue         String?
+  reason           String?
+  changedByUserId  String?   @db.Uuid
+  changedAt        DateTime  @default(now())
+  measureAfterDate DateTime?
+  createdAt        DateTime  @default(now())
+
+  website        Website         @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  task           Task?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  recommendation Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+  page           Page?           @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  changedBy      User?           @relation("ChangeLogUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId])
+  @@index([clientId])
+  @@index([changedAt])
+}
+
+// --- Agent system ---
+
+enum AgentType {
+  DATA_INGESTION
+  TECHNICAL_SEO
+  SEARCH_PERFORMANCE
+  CONTENT_OPPORTUNITY
+  ON_PAGE_SEO
+  COMPETITOR_ANALYSIS
+  PRIORITIZATION
+  QA
+  REPORTING
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  VALIDATION_FAILED
+}
+
+model AgentRun {
+  id              String         @id @default(cuid())
+  websiteId       String
+  clientId        String?
+  agentType       AgentType
+  status          AgentRunStatus @default(PENDING)
+  provider        String?
+  model           String?
+  temperature     Float?
+  maxTokens       Int?
+  promptVersion   String?
+  inputSummary    Json           @default("{}")
+  rawOutput       String?        @db.Text
+  parsedOutput    Json?
+  errorMessage    String?
+  validationError String?        @db.Text
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  client  Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([websiteId])
+  @@index([clientId])
+  @@index([agentType])
+  @@index([status])
+}
+
+// --- Reporting ---
+
+model MonthlyReport {
+  id                  String   @id @default(cuid())
+  websiteId           String
+  clientId            String
+  month               Int
+  year                Int
+  dateStart           DateTime
+  dateEnd             DateTime
+  summary             String
+  wins                Json     @default("[]")
+  losses              Json     @default("[]")
+  completedTasks      Json     @default("[]")
+  openTasks           Json     @default("[]")
+  recommendations     Json     @default("[]")
+  nextMonthPriorities Json     @default("[]")
+  generatedAt         DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, month, year])
+  @@index([clientId])
+}
