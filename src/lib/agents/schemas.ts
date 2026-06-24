@@ -50,6 +50,7 @@ export const prioritizationOutputSchema = z.object({
   prioritizedRecommendations: z
     .array(
       agentRecommendationSchema.extend({
+        recommendationId: z.string().optional(),
         score: z.number(),
         rank: z.number().int().positive(),
       }),

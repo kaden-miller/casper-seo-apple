@@ -1,5 +1,11 @@
 export { agentRegistry, getAgentDefinition, listEnabledAgents } from "./agent-registry";
 export { loadAgentPrompt } from "./load-prompt";
+export {
+  buildAgentInput,
+  agentUsesDatabaseInput,
+  PHASE_8_AGENTS,
+} from "./input-builders";
+export { persistAgentOutput } from "./persist-output";
 export { isAgentName, runAgent } from "./run-agent";
 export {
   agentOutputSchemas,

@@ -6,6 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getAgentDefinition } from "./agent-registry";
 import { runDataIngestionSystemAgent } from "./system/data-ingestion";
 import { loadAgentPrompt } from "./load-prompt";
+import { persistAgentOutput } from "./persist-output";
 import { getAgentOutputSchema } from "./schemas";
 import type { AgentName, RunAgentParams, RunAgentResult } from "./types";
 import { AGENT_NAME_TO_TYPE } from "./types";
@@ -67,6 +68,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
         model: modelConfig.model,
         temperature: modelConfig.temperature,
         maxTokens: modelConfig.maxTokens,
+        reasoningEffort: modelConfig.reasoningEffort,
         jsonMode: true,
         messages: [
           { role: "system", content: prompt },
@@ -91,6 +93,16 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
       });
 
       rawOutput = completion.content;
+
+      if (!rawOutput.trim()) {
+        const finishHint = completion.finishReason
+          ? `finish_reason=${completion.finishReason}`
+          : "no finish reason";
+        throw new Error(
+          `Model returned empty output (${finishHint}, max_output_tokens=${completion.maxOutputTokens}). ` +
+            "For gpt-5/o-series, lower DEFAULT_AI_REASONING_EFFORT (try low or medium) or increase agent maxTokens.",
+        );
+      }
     }
 
     const jsonText = extractJsonFromModelOutput(rawOutput);
@@ -101,13 +113,17 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to parse JSON output";
+      const parseDetail =
+        jsonText.trim().length === 0
+          ? "Model output was empty after extraction."
+          : `Received ${jsonText.length} characters.`;
 
       await prisma.agentRun.update({
         where: { id: agentRun.id },
         data: {
           status: "VALIDATION_FAILED",
           rawOutput,
-          validationError: `JSON parse error: ${message}`,
+          validationError: `JSON parse error: ${message}. ${parseDetail}`,
           finishedAt: new Date(),
         },
       });
@@ -120,7 +136,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
         model: agentRun.model,
         rawOutput,
         parsedOutput: null,
-        validationError: `JSON parse error: ${message}`,
+        validationError: `JSON parse error: ${message}. ${parseDetail}`,
         errorMessage: null,
       };
     }
@@ -164,6 +180,14 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
       },
     });
 
+    const persistResult = await persistAgentOutput(
+      params.agentName,
+      params.websiteId,
+      clientId,
+      agentRun.id,
+      validation.data,
+    );
+
     return {
       agentRunId: agentRun.id,
       agentName: params.agentName,
@@ -174,6 +198,8 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
       parsedOutput: validation.data,
       validationError: null,
       errorMessage: null,
+      recommendationsCreated: persistResult.recommendationsCreated,
+      recommendationsUpdated: persistResult.recommendationsUpdated,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Agent run failed";

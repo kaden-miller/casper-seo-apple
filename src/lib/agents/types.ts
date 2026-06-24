@@ -44,6 +44,8 @@ export type RunAgentResult = {
   parsedOutput: unknown | null;
   validationError: string | null;
   errorMessage: string | null;
+  recommendationsCreated?: number;
+  recommendationsUpdated?: number;
 };
 
 export const AGENT_NAME_TO_TYPE: Record<AgentName, AgentType> = {

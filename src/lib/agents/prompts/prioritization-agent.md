@@ -39,6 +39,6 @@ Return valid JSON matching `prioritizationOutputSchema`:
 ## Rules
 
 - Return valid JSON only.
-- Do not invent new recommendations; prioritize the input set.
-- Higher rank means higher priority.
-- Explain scoring through supporting data, not prose outside JSON.
+- Echo `recommendationId` from input for each prioritized item.
+- Score using impact, confidence, effort, risk, and business relevance.
+- Do not invent new recommendations; only rank the provided set.

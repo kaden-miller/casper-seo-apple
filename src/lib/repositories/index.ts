@@ -7,4 +7,6 @@ export { ga4Repository } from "./ga4";
 export { pageRepository } from "./pages";
 export { recommendationRepository } from "./recommendations";
 export { taskRepository } from "./tasks";
+export { changeLogRepository } from "./change-logs";
+export { monthlyReportRepository } from "./monthly-reports";
 export { agentRunRepository } from "./agent-runs";

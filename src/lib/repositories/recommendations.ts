@@ -1,9 +1,20 @@
-import type { RecommendationStatus } from "@/generated/prisma/client";
+import type {
+  PriorityLevel,
+  RecommendationStatus,
+  RecommendationType,
+} from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import {
   organizationWebsiteFilter,
   requireOrganization,
 } from "@/lib/repositories/base";
+
+export type RecommendationListFilters = {
+  websiteId?: string;
+  status?: RecommendationStatus;
+  priority?: PriorityLevel;
+  type?: RecommendationType;
+};
 
 export const recommendationRepository = {
   async listForWebsite(websiteId: string, status?: RecommendationStatus) {
@@ -20,6 +31,25 @@ export const recommendationRepository = {
     });
   },
 
+  async listForOrganization(filters: RecommendationListFilters = {}) {
+    const organization = await requireOrganization();
+
+    return prisma.recommendation.findMany({
+      where: {
+        website: organizationWebsiteFilter(organization.id),
+        ...(filters.websiteId ? { websiteId: filters.websiteId } : {}),
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.priority ? { priority: filters.priority } : {}),
+        ...(filters.type ? { type: filters.type } : {}),
+      },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      include: {
+        page: true,
+        website: { include: { client: true } },
+      },
+    });
+  },
+
   async getById(recommendationId: string) {
     const organization = await requireOrganization();
 
@@ -31,7 +61,8 @@ export const recommendationRepository = {
       include: {
         page: true,
         website: { include: { client: true } },
-        tasks: true,
+        tasks: { orderBy: { createdAt: "desc" } },
+        changeLogs: { orderBy: { changedAt: "desc" } },
       },
     });
   },

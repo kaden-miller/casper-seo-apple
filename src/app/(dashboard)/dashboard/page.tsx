@@ -13,6 +13,10 @@ import {
 } from "@/components/app-sidebar";
 import { listClientsForUser, listWebsitesForUser } from "@/lib/data/seo";
 import { prisma } from "@/lib/db";
+import {
+  recommendationRepository,
+  taskRepository,
+} from "@/lib/repositories";
 
 async function getDbStatus(): Promise<"ok" | "error"> {
   try {
@@ -24,10 +28,13 @@ async function getDbStatus(): Promise<"ok" | "error"> {
 }
 
 export default async function DashboardPage() {
-  const [dbStatus, clients, websites] = await Promise.all([
+  const [dbStatus, clients, websites, openRecommendations, openTasks] =
+    await Promise.all([
     getDbStatus(),
     listClientsForUser(),
     listWebsitesForUser(),
+    recommendationRepository.countOpenForOrganization(),
+    taskRepository.countOpenForOrganization(),
   ]);
 
   return (
@@ -66,6 +73,38 @@ export default async function DashboardPage() {
                 className="mt-1 inline-block text-sm text-muted-foreground hover:underline"
               >
                 View all websites
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Open recommendations</CardTitle>
+              <CardDescription>Detected, in review, or approved</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{openRecommendations}</p>
+              <Link
+                href="/recommendations"
+                className="mt-1 inline-block text-sm text-muted-foreground hover:underline"
+              >
+                Review recommendations
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Open tasks</CardTitle>
+              <CardDescription>Work in progress across clients</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold">{openTasks}</p>
+              <Link
+                href="/tasks"
+                className="mt-1 inline-block text-sm text-muted-foreground hover:underline"
+              >
+                View task board
               </Link>
             </CardContent>
           </Card>

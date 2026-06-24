@@ -1,4 +1,9 @@
 import OpenAI from "openai";
+import {
+  buildChatCompletionParams,
+  resolveMaxOutputTokens,
+  resolveReasoningEffort,
+} from "./model-params";
 import type { AiCompletionRequest, AiCompletionResult } from "./types";
 
 let openaiClient: OpenAI | null = null;
@@ -20,18 +25,34 @@ async function runOpenAiCompletion(
   request: AiCompletionRequest,
 ): Promise<AiCompletionResult> {
   const client = getOpenAiClient();
-  const response = await client.chat.completions.create({
-    model: request.model,
-    temperature: request.temperature,
-    max_tokens: request.maxTokens,
-    response_format: request.jsonMode ? { type: "json_object" } : undefined,
-    messages: request.messages,
-  });
+  const response = await client.chat.completions.create(
+    buildChatCompletionParams({
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+      reasoningEffort: request.reasoningEffort,
+      jsonMode: request.jsonMode,
+      messages: request.messages,
+    }),
+  );
+
+  const choice = response.choices[0];
+  const reasoningEffort = resolveReasoningEffort(
+    request.model,
+    request.reasoningEffort,
+  );
+  const maxOutputTokens = resolveMaxOutputTokens(
+    request.model,
+    request.maxTokens,
+    reasoningEffort,
+  );
 
   return {
-    content: response.choices[0]?.message?.content ?? "",
+    content: choice?.message?.content ?? "",
     provider: "openai",
     model: request.model,
+    finishReason: choice?.finish_reason ?? null,
+    maxOutputTokens,
   };
 }
 

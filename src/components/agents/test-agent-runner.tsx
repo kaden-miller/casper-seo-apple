@@ -290,6 +290,14 @@ export function TestAgentRunner({
                 </pre>
               </div>
             ) : null}
+
+            {result.status === "SUCCESS" &&
+            (result.recommendationsCreated || result.recommendationsUpdated) ? (
+              <p className="text-sm text-muted-foreground">
+                Persisted {result.recommendationsCreated ?? 0} new and{" "}
+                {result.recommendationsUpdated ?? 0} updated recommendation(s).
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

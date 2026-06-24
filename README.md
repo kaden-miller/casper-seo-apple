@@ -232,8 +232,52 @@ Agent framework: `src/lib/agents/` · AI provider: `src/lib/ai/`
 
 - Per-agent defaults live in `src/lib/ai/agent-model-config.ts`
 - Override via env vars like `ON_PAGE_SEO_MODEL` or `DEFAULT_AI_MODEL`
+- Set reasoning effort via `DEFAULT_AI_REASONING_EFFORT` or per-agent vars like `ON_PAGE_SEO_REASONING_EFFORT` (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`)
+- Reasoning effort is only sent for o-series / gpt-5+ models; gpt-4.x ignores it
+- gpt-5 / o-series models automatically use `max_completion_tokens` instead of `max_tokens`
+- Token budget is auto-scaled for reasoning models so JSON output is not truncated
+- For structured agents, prefer `low` or `medium` reasoning effort; `high` costs more and needs a larger token budget
 - Agents must call `runAgent()` — never import the OpenAI SDK directly in agent files
 - `dataIngestionAgent` is a system agent (no LLM call) that checks crawl/GSC/GA4 freshness
+
+## Phase 8 verification
+
+1. Ensure website has crawl + GSC (+ GA4 optional) data synced
+2. Set `OPENAI_API_KEY` in `.env`
+3. Open website dashboard → **Recommendations** panel
+4. Run **Technical SEO**, **Search Performance**, or **On-Page SEO** agent
+5. Confirm new `Recommendation` rows appear in the table and database
+6. Run **Prioritization** agent — verify priority/impact fields update
+7. Run **QA** agent — verify recommendations move to APPROVED, REJECTED, or NEEDS_REVIEW
+8. Invalid agent JSON still stores `VALIDATION_FAILED` on `AgentRun` without creating recommendations
+
+Agent input builders: `src/lib/agents/input-builders/` · Persistence: `src/lib/agents/persist-output.ts`
+
+## Phase 9 verification
+
+1. Open **Recommendations** in the sidebar (`/recommendations`)
+2. Filter by website, status, or priority
+3. Open a recommendation detail page — review supporting data, description, and reason
+4. **Approve** or **Reject** a recommendation; confirm status updates in the table
+5. **Edit** fields (title, suggested value, priority) and save
+6. **Convert to task** — confirm redirect to task detail and recommendation status becomes `CONVERTED_TO_TASK`
+7. Open **Tasks** (`/tasks`) — board view groups tasks by status; use filters for table view
+8. On task detail, change status (e.g. In progress) or **Complete task** with change type and notes
+9. Confirm a `ChangeLog` row is created and linked recommendation moves to `COMPLETED` when applicable
+
+Workflow UI: `src/app/(dashboard)/recommendations/` · `src/app/(dashboard)/tasks/`
+
+## Phase 10 verification
+
+1. Ensure a website has GSC and/or GA4 data synced, plus some tasks/recommendations
+2. Set `OPENAI_API_KEY` in `.env`
+3. Open **Reports** in the sidebar (`/reports`) or use **Monthly reports** on a website dashboard
+4. Select website + month/year → **Generate monthly report**
+5. Confirm redirect to report detail with executive summary, performance tables, wins/losses, and priorities
+6. Verify `MonthlyReport` row in database with structured JSON for tasks and recommendations
+7. Re-generate the same month — report should update in place (unique per website + month + year)
+
+Report pipeline: `src/lib/reports/` · Reporting agent: `reportingAgent`
 
 ## Scripts
 

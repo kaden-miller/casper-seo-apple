@@ -30,10 +30,10 @@ const navItems = [
   { href: "/clients", label: "Clients", icon: Building2, enabled: true },
   { href: "/websites", label: "Websites", icon: Globe, enabled: true },
   { href: "/agents/test", label: "Agent test", icon: Bot, enabled: true },
-  { href: "/recommendations", label: "Recommendations", icon: Lightbulb, enabled: false },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare, enabled: false },
+  { href: "/recommendations", label: "Recommendations", icon: Lightbulb, enabled: true },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare, enabled: true },
   { href: "/pages", label: "Pages", icon: StickyNote, enabled: true },
-  { href: "/reports", label: "Reports", icon: FileText, enabled: false },
+  { href: "/reports", label: "Reports", icon: FileText, enabled: true },
   { href: "/settings", label: "Settings", icon: Settings, enabled: false },
 ] as const;
 

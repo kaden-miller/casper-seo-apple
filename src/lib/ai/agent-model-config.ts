@@ -1,4 +1,5 @@
 import type { AgentName } from "@/lib/agents/types";
+import { reasoningEffortFromEnv } from "./reasoning-effort";
 import type { AgentModelConfig } from "./types";
 
 function modelFromEnv(
@@ -14,6 +15,7 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("DATA_INGESTION_MODEL", "gpt-4.1-mini"),
     temperature: 0.1,
     maxTokens: 2000,
+    reasoningEffort: reasoningEffortFromEnv("DATA_INGESTION_REASONING_EFFORT"),
     promptVersion: "v1",
     enabled: true,
   },
@@ -22,6 +24,7 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("TECHNICAL_SEO_MODEL"),
     temperature: 0.2,
     maxTokens: 4000,
+    reasoningEffort: reasoningEffortFromEnv("TECHNICAL_SEO_REASONING_EFFORT"),
     promptVersion: "v1",
     enabled: true,
   },
@@ -30,6 +33,9 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("SEARCH_PERFORMANCE_MODEL"),
     temperature: 0.2,
     maxTokens: 5000,
+    reasoningEffort: reasoningEffortFromEnv(
+      "SEARCH_PERFORMANCE_REASONING_EFFORT",
+    ),
     promptVersion: "v1",
     enabled: true,
   },
@@ -38,6 +44,9 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("CONTENT_OPPORTUNITY_MODEL"),
     temperature: 0.4,
     maxTokens: 6000,
+    reasoningEffort: reasoningEffortFromEnv(
+      "CONTENT_OPPORTUNITY_REASONING_EFFORT",
+    ),
     promptVersion: "v1",
     enabled: true,
   },
@@ -46,6 +55,7 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("ON_PAGE_SEO_MODEL"),
     temperature: 0.4,
     maxTokens: 6000,
+    reasoningEffort: reasoningEffortFromEnv("ON_PAGE_SEO_REASONING_EFFORT"),
     promptVersion: "v1",
     enabled: true,
   },
@@ -54,6 +64,9 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("COMPETITIVE_ANALYSIS_MODEL"),
     temperature: 0.3,
     maxTokens: 6000,
+    reasoningEffort: reasoningEffortFromEnv(
+      "COMPETITIVE_ANALYSIS_REASONING_EFFORT",
+    ),
     promptVersion: "v1",
     enabled: true,
   },
@@ -62,6 +75,7 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("PRIORITIZATION_MODEL"),
     temperature: 0.2,
     maxTokens: 4000,
+    reasoningEffort: reasoningEffortFromEnv("PRIORITIZATION_REASONING_EFFORT"),
     promptVersion: "v1",
     enabled: true,
   },
@@ -70,6 +84,7 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("QA_AGENT_MODEL"),
     temperature: 0.1,
     maxTokens: 5000,
+    reasoningEffort: reasoningEffortFromEnv("QA_AGENT_REASONING_EFFORT"),
     promptVersion: "v1",
     enabled: true,
   },
@@ -78,6 +93,7 @@ export const agentModelConfig: Record<AgentName, AgentModelConfig> = {
     model: modelFromEnv("REPORTING_AGENT_MODEL"),
     temperature: 0.3,
     maxTokens: 6000,
+    reasoningEffort: reasoningEffortFromEnv("REPORTING_AGENT_REASONING_EFFORT"),
     promptVersion: "v1",
     enabled: true,
   },

@@ -16,6 +16,8 @@ import { CrawlStatusPanel } from "@/components/websites/crawl-status-panel";
 import { Ga4IntegrationPanel } from "@/components/websites/ga4-integration-panel";
 import { GscIntegrationPanel } from "@/components/websites/gsc-integration-panel";
 import { KeywordForm } from "@/components/websites/keyword-form";
+import { MonthlyReportsPanel } from "@/components/websites/monthly-reports-panel";
+import { RecommendationsPanel } from "@/components/websites/recommendations-panel";
 import { PageInventoryTable } from "@/components/websites/page-inventory-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,8 +38,11 @@ import {
 } from "@/components/ui/table";
 import { getWebsiteForUser } from "@/lib/data/seo";
 import { runWebsiteAnalysis } from "@/lib/analysis";
+import { PHASE_8_AGENTS, agentRegistry } from "@/lib/agents";
+import { isAiConfigured } from "@/lib/ai/agent-model-config";
 import { isGoogleOAuthConfigured } from "@/lib/integrations/google/config";
-import { ga4Repository, gscRepository, integrationRepository, pageRepository } from "@/lib/repositories";
+import { ga4Repository, gscRepository, integrationRepository, monthlyReportRepository, pageRepository, recommendationRepository } from "@/lib/repositories";
+import { defaultReportPeriod } from "@/lib/reports/month-period";
 import { formatCommaList } from "@/lib/utils/form";
 
 type WebsiteDetailPageProps = {
@@ -109,6 +114,8 @@ export default async function WebsiteDetailPage({
     gscSummary,
     ga4Summary,
     analysis,
+    recommendations,
+    monthlyReports,
   ] = await Promise.all([
     getWebsiteForUser(id),
     pageRepository.listWithLatestSnapshot(id),
@@ -119,6 +126,8 @@ export default async function WebsiteDetailPage({
     gscRepository.getDashboardSummary(id),
     ga4Repository.getDashboardSummary(id),
     runWebsiteAnalysis(id),
+    recommendationRepository.listForWebsite(id),
+    monthlyReportRepository.listForWebsite(id),
   ]);
 
   if (!website) {
@@ -137,6 +146,13 @@ export default async function WebsiteDetailPage({
   const previousGsc = gscSummary.previous;
   const currentGa4 = ga4Summary.current;
   const previousGa4 = ga4Summary.previous;
+  const phase8Agents = agentRegistry
+    .filter((agent) => PHASE_8_AGENTS.includes(agent.name))
+    .map((agent) => ({
+      name: agent.name,
+      displayName: agent.displayName,
+    }));
+  const defaultPeriod = defaultReportPeriod();
 
   return (
     <>
@@ -367,6 +383,23 @@ export default async function WebsiteDetailPage({
               </Button>
             </CardContent>
           </Card>
+
+          <RecommendationsPanel
+            websiteId={website.id}
+            recommendations={recommendations}
+            aiConfigured={isAiConfigured()}
+            agents={phase8Agents}
+          />
+
+          <MonthlyReportsPanel
+            websiteId={website.id}
+            websiteName={website.name}
+            clientName={website.client.name}
+            reports={monthlyReports}
+            defaultYear={defaultPeriod.year}
+            defaultMonth={defaultPeriod.month}
+            aiConfigured={isAiConfigured()}
+          />
 
           {ga4Summary.topLandingPages.length > 0 ? (
             <Card>
